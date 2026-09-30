@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Doctor{% endblock %}
+{% block heading %}Doctor{% endblock %}
+{% block subheading %}See your current patient. Finish the consultation and the next patient is sent to you.{% endblock %}
+{% block content %}
+<section id="picker" class="hidden" aria-labelledby="pick-h">
+  <h2 class="t-h2" id="pick-h">Who is using this screen?</h2>
+  <p class="muted mt-4">Choose your name. This device remembers it until you switch.</p>
+  <div class="doc-pick mt-16" id="doc-list"></div>
+</section>
+
+<section id="work" class="hidden">
+  <nav class="doc-switch" id="doc-switch" aria-label="Switch doctor"></nav>
+  <div class="card doc-bar">
+    <div class="card-body row wrap gap-16">
+      <span class="avatar-lg" id="d-avatar" aria-hidden="true"></span>
+      <div class="grow">
+        <h2 class="t-h2" id="d-name"></h2>
+        <p class="muted" id="d-sub"></p>
+      </div>
+      <div class="stack-8">
+        <span class="label" id="status-label">Your status</span>
+        <div class="segmented" id="d-status" role="group" aria-labelledby="status-label">
+          <button type="button" data-s="available" data-icon="check">Available</button>
+          <button type="button" data-s="break" data-icon="coffee">On a break</button>
+          <button type="button" data-s="off_duty" data-icon="power">Off duty</button>
+        </div>
+      </div>
+      <button class="btn btn-ghost" id="switch-doc" type="button" data-icon="users">Switch doctor</button>
+    </div>
+  </div>
+
+  <div class="preempt-note hidden mt-16" id="preempt" role="alert"></div>
+
+  <div class="doc-grid mt-24">
+    <section class="card" id="current" aria-label="Current patient"></section>
+    <aside class="stack-24">
+      <section class="card">
+        <div class="card-head"><h3>Next patients</h3><span class="sub" id="q-len"></span></div>
+        <div class="next-list" id="upnext"></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><h3>Your day</h3></div>
+        <div class="card-body day-stats" id="day"></div>
+      </section>
+    </aside>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/doctor.js') }}?v={{ static_v }}"></script>{% endblock %}

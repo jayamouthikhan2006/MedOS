@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block body %}
+<main class="login-page">
+  <form class="card login-card" id="login" autocomplete="off" aria-labelledby="login-h">
+    <a class="brand" href="/"><svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>MedOS</b><span>{{ hospital_name }}</span></span></a>
+    <div>
+      <h1 class="t-h1" id="login-h">Sign in</h1>
+      <p class="muted mt-4">Choose where you work, then enter your PIN.</p>
+    </div>
+
+    <fieldset class="role-options">
+      <legend class="sr-only">Your role</legend>
+      <label class="role-opt"><input type="radio" name="role" value="reception"><span class="box" data-icon="desk"><span><b>Reception</b><small>Register patients and manage the queue</small></span></span></label>
+      <label class="role-opt"><input type="radio" name="role" value="doctor"><span class="box" data-icon="stetho"><span><b>Doctor</b><small>See your current and next patient</small></span></span></label>
+      <label class="role-opt"><input type="radio" name="role" value="admin"><span class="box" data-icon="shield"><span><b>Admin</b><small>Staff, rooms, settings and reports</small></span></span></label>
+    </fieldset>
+
+    <div class="field">
+      <label for="pin">PIN</label>
+      <input id="pin" class="input pin-input" inputmode="numeric" type="password" maxlength="8" autocomplete="current-password" aria-describedby="pin-hint">
+      <p class="helper" id="pin-hint"></p>
+    </div>
+    <div class="keypad" aria-hidden="true">
+      {% for k in ['1','2','3','4','5','6','7','8','9','clear','0','back'] %}
+      <button type="button" tabindex="-1" data-k="{{ k }}" {% if k in ['clear','back'] %}class="fn"{% endif %}>{% if k == 'clear' %}Clear{% elif k == 'back' %}Delete{% else %}{{ k }}{% endif %}</button>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary btn-lg btn-block" type="submit" id="go">Sign in</button>
+    <a class="btn btn-ghost btn-block" href="/" data-icon="arrowLeft">Back to home</a>
+  </form>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { $, $$, api, hydrateIcons, toastError } from "/static/js/core.js";
+  hydrateIcons();
+  const want = {{ want|tojson }}, next = {{ next|tojson }};
+  const radio = $(`input[name=role][value="${want}"]`) || $("input[name=role]");
+  radio.checked = true;
+  const pin = $("#pin");
+  $$(".keypad button").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.k;
+    if (k === "clear") pin.value = ""; else if (k === "back") pin.value = pin.value.slice(0, -1); else if (pin.value.length < 8) pin.value += k;
+    pin.focus();
+  }));
+  $$("input[name=role]").forEach((r) => r.addEventListener("change", () => pin.focus()));
+  const me = await api("me");
+  $("#pin-hint").textContent = !me.require_pin ? "PINs are switched off. Any PIN works."
+    : me.pins_default ? "First start: staff PIN is 1111, admin PIN is 1234. Change them in Admin, Settings." : "Ask your administrator if you don't know the PIN.";
+  $("#login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const role = $("input[name=role]:checked").value;
+    const btn = $("#go"); btn.disabled = true;
+    try {
+      await api("login", { method: "POST", body: { role, pin: pin.value } });
+      location.href = next && next.startsWith("/") ? next : "/" + role;
+    } catch (err) {
+      pin.value = ""; pin.classList.remove("shake"); void pin.offsetWidth; pin.classList.add("shake"); toastError(err); btn.disabled = false; pin.focus();
+    }
+  });
+  pin.focus();
+</script>
+{% endblock %}

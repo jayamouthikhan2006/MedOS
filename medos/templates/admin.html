@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block heading %}Admin{% endblock %}
+{% block subheading %}How the department is doing, and everything you can set up.{% endblock %}
+{% block content %}
+<nav class="tabs admin-tabs" role="tablist" aria-label="Admin sections" id="tabs">
+  <button role="tab" data-tab="overview" data-icon="chart" id="tab-btn-overview">Overview</button>
+  <button role="tab" data-tab="staff" data-icon="users">Doctors and rooms</button>
+  <button role="tab" data-tab="protocol" data-icon="clipboard">Triage rules</button>
+  <button role="tab" data-tab="devices" data-icon="chip">Devices</button>
+  <button role="tab" data-tab="ai" data-icon="spark">AI assistant</button>
+  <button role="tab" data-tab="system" data-icon="cpu">System</button>
+  <button role="tab" data-tab="settings" data-icon="sliders">Settings</button>
+</nav>
+
+<section class="tab-panel stack-24" id="tab-overview" role="tabpanel" aria-label="Overview">
+  <div class="stats" id="kpis"></div>
+  <div id="alerts-box"></div>
+  <div class="ov-grid">
+    <div class="stack-24">
+      <section class="card"><div class="card-head"><h2>Rooms</h2><span class="sub" id="rooms-sum"></span></div><div class="card-body rooms" id="floor"></div></section>
+      <section class="card"><div class="card-head"><h2>Waiting time by priority</h2><span class="sub">today, in minutes</span></div><div class="card-body" id="wait-by-level"></div></section>
+    </div>
+    <div class="stack-24">
+      <section class="card"><div class="card-head"><h2>Doctors</h2><span class="sub" id="docs-sum"></span></div><div class="people" id="doc-rows"></div></section>
+      <section class="card"><div class="card-head"><h2>Arrivals today</h2><span class="sub" id="arr-total"></span></div><div class="card-body"><div class="bars" id="arrivals" role="img" aria-label="Arrivals per hour"></div><div class="axis" id="arr-axis" aria-hidden="true"></div></div></section>
+    </div>
+  </div>
+  <section class="card"><div class="card-head"><h2>Recent activity</h2><a class="btn btn-sm btn-ghost" href="#system">Full log</a></div><div class="card-body log" id="ov-log"></div></section>
+</section>
+
+<section class="tab-panel stack-24" id="tab-staff" role="tabpanel" aria-label="Doctors and rooms" hidden>
+  <section class="card">
+    <div class="card-head"><h2>Doctors</h2><span class="sub">Doctors set their own status from the Doctor screen.</span><button class="btn btn-primary btn-sm" id="add-doc" type="button" data-icon="plus">Add doctor</button></div>
+    <div class="table-wrap"><table class="table" id="doc-table"></table></div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>Rooms</h2><span class="sub">Close a room or mark it for cleaning when it can't be used.</span><button class="btn btn-primary btn-sm" id="add-room" type="button" data-icon="plus">Add room</button></div>
+    <div class="table-wrap"><table class="table" id="room-table"></table></div>
+  </section>
+</section>
+
+<section class="tab-panel" id="tab-protocol" role="tabpanel" aria-label="Triage rules" hidden>
+  <div class="side-grid">
+    <section class="card">
+      <div class="card-head"><h2>Priority table</h2><button class="btn btn-ghost btn-sm" id="reset-cond" type="button" data-icon="refresh">Restore defaults</button><button class="btn btn-primary btn-sm" id="add-cond" type="button" data-icon="plus">Add condition</button></div>
+      <div class="table-wrap"><table class="table proto" id="cond-table"></table></div>
+    </section>
+    <aside class="stack-24">
+      <section class="card"><div class="card-head"><h2>Try the rules</h2></div>
+        <div class="card-body stack">
+          <div class="field"><label for="proto-test">Symptoms</label><textarea class="textarea" id="proto-test" placeholder="e.g. bad headache and vomiting since yesterday"></textarea></div>
+          <div id="proto-result"></div>
+        </div></section>
+      <section class="card"><div class="card-head"><h2>How the rules work</h2></div>
+        <div class="card-body prose"><ul>
+          <li>The most urgent matching condition sets the priority.</li>
+          <li>Separate keywords with commas. Plurals and -ing or -ed endings match automatically.</li>
+          <li><span class="kbd">severe+stomach pain</span> needs both parts in the same sentence.</li>
+          <li><span class="kbd">dehydrat*</span> matches any word that starts with it.</li>
+          <li>Words after <i>no</i>, <i>not</i>, <i>without</i> or <i>denies</i> are ignored, so "no chest pain" doesn't match.</li>
+          <li>Rank 0 rows are red flags and always Critical. A lower rank is seen sooner within the same priority.</li>
+        </ul></div></section>
+    </aside>
+  </div>
+</section>
+
+<section class="tab-panel" id="tab-devices" role="tabpanel" aria-label="Devices" hidden>
+  <div class="side-grid">
+    <section class="card">
+      <div class="card-head"><h2>Emergency button, light and buzzer</h2><span id="hw-mode"></span></div>
+      <div class="card-body stack" id="hw-diagram"></div>
+    </section>
+    <aside class="stack-24">
+      <section class="card"><div class="card-head"><h2>Test the devices</h2></div><div class="card-body stack" id="hw-state"></div></section>
+      <section class="card"><div class="card-head"><h2>Voice registration</h2></div><div class="card-body" id="voice-state"></div></section>
+    </aside>
+  </div>
+</section>
+
+<section class="tab-panel" id="tab-ai" role="tabpanel" aria-label="AI assistant" hidden>
+  <div class="grid-2">
+    <div class="stack-24">
+      <section class="card"><div class="card-head"><h2>Connection to the AI model</h2><span id="llm-badge"></span></div><div class="card-body stack" id="llm-form"></div></section>
+      <section class="card"><div class="card-head"><h2>Use the Qwen model on your laptop</h2></div>
+        <div class="card-body prose"><ul>
+          <li>On the laptop, run <span class="kbd">laptop\enable-ollama-lan.ps1</span> once. It lets Ollama accept connections from the Pi.</li>
+          <li>Connect the laptop and the Pi to the same network, then press <b>Find on network</b>.</li>
+          <li>No laptop? Install Ollama on the Pi, pull <span class="kbd">qwen3:1.7b</span> and use <span class="kbd">http://localhost:11434</span>.</li>
+          <li>The AI only ever raises a priority. The built-in rules keep working when it's offline.</li>
+        </ul></div></section>
+    </div>
+    <div class="stack-24">
+      <section class="card"><div class="card-head"><h2>Shift handover report</h2><button class="btn btn-sm" id="gen-report" type="button" data-icon="spark">Write report</button></div>
+        <div class="card-body prose" id="report"><p class="muted">A short handover note written from today's numbers.</p></div></section>
+      <section class="card"><div class="card-head"><h2>Ask about today</h2></div>
+        <form class="card-body stack" id="ask">
+          <div class="field"><label for="ask-q">Your question</label><div class="row"><input class="input grow" id="ask-q" placeholder="Which priority waited longest today?"><button class="btn btn-primary" type="submit" data-icon="send">Ask</button></div></div>
+          <div class="prose" id="ask-a"></div>
+        </form></section>
+    </div>
+  </div>
+</section>
+
+<section class="tab-panel stack-24" id="tab-system" role="tabpanel" aria-label="System" hidden>
+  <section class="card"><div class="card-head"><h2>Raspberry Pi health</h2><span class="sub" id="sys-model"></span></div><div class="card-body meters" id="sys-strip"></div></section>
+  <div class="grid-2">
+    <section class="card"><div class="card-head"><h2>Operating-system concepts, live</h2></div><div id="concepts"></div></section>
+    <section class="card"><div class="card-head"><h2>Threads</h2><span class="sub" id="thr-count"></span></div><div class="table-wrap"><table class="table" id="threads"></table></div></section>
+  </div>
+  <section class="card">
+    <div class="card-head"><h2>Scheduler log</h2>
+      <label class="row gap-8"><span class="t-small muted">Show</span><select class="select" id="log-kind" style="width:auto;min-height:40px"><option value="">Everything</option>
+        <option value="ARRIVE">Arrivals</option><option value="DISPATCH">Patients sent to doctors</option><option value="AGING">Waiting-time overtakes</option><option value="PREEMPT">Paused consultations</option><option value="INTERRUPT">Emergency interrupts</option>
+        <option value="AI">AI reviews</option><option value="COMPLETE">Finished visits</option><option value="ALERT">Alerts</option><option value="DOCTOR">Doctor status</option><option value="ADMIN">Admin changes</option><option value="SYSTEM">System</option></select></label>
+    </div>
+    <div class="card-body log log-scroll" id="log"></div>
+  </section>
+</section>
+
+<section class="tab-panel" id="tab-settings" role="tabpanel" aria-label="Settings" hidden>
+  <div class="set-grid" id="settings"></div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/admin.js') }}?v={{ static_v }}"></script>{% endblock %}

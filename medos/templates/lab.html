@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Scheduler Lab{% endblock %}
+{% block heading %}Scheduler Lab{% endblock %}
+{% block subheading %}Run the same patients through four scheduling methods and compare who waits, and for how long.{% endblock %}
+{% block content %}
+<div class="lab-grid">
+  <aside class="card lab-controls" aria-labelledby="lab-set-h">
+    <div class="card-head"><h2 id="lab-set-h">Set up the test</h2></div>
+    <div class="card-body stack">
+      <div class="field"><span class="label" id="src-l">Which patients</span>
+        <div class="segmented block" id="src" role="group" aria-labelledby="src-l"><button type="button" data-v="random" aria-pressed="true">A busy shift</button><button type="button" data-v="today" aria-pressed="false">Today's real patients</button></div></div>
+      <div class="field rnd"><label for="n">Patients arriving<output id="n-o"></output></label><input type="range" id="n" min="10" max="80" value="36"></div>
+      <div class="field rnd"><label for="win">Over this many minutes<output id="win-o"></output></label><input type="range" id="win" min="20" max="240" step="10" value="120"></div>
+      <div class="field rnd"><label for="em">Emergency button presses<output id="em-o"></output></label><input type="range" id="em" min="0" max="4" value="2"></div>
+      <div class="field"><label for="docs">Doctors on duty<output id="docs-o"></output></label><input type="range" id="docs" min="1" max="6" value="3"></div>
+      <div class="field"><label for="rate">Waiting bonus per minute<output id="rate-o"></output></label><input type="range" id="rate" min="0" max="20" step="0.5" value="5"></div>
+      <div class="field"><label for="cap">Waiting bonus limit<output id="cap-o"></output></label><input type="range" id="cap" min="0" max="800" step="10" value="450"></div>
+      <button class="btn btn-primary" id="run" type="button" data-icon="refresh">Try different patients</button>
+      <p class="helper">Average consultation: Critical 25, High 15, Medium 10, Low 7 minutes (±30%).</p>
+    </div>
+  </aside>
+
+  <div class="stack-24">
+    <section class="card">
+      <div class="card-head"><h2>Results</h2><span class="sub" id="summary"></span></div>
+      <div class="table-wrap"><table class="table algo-tbl" id="results"></table></div>
+      <div class="card-foot"><p class="t-small muted">Green is the best result in each row, red the worst. Times are in minutes.</p></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Average wait by priority</h2><span class="sub">minutes from arrival to seeing a doctor</span></div>
+      <div class="card-body"><div class="wait-chart" id="wchart"></div><div class="legend mt-16" id="wlegend"></div></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>Who saw whom, and when</h2><div class="segmented" id="algo-pick" role="group" aria-label="Scheduling method"></div></div>
+      <div class="card-body"><div class="gantt" id="gantt"></div><p class="t-small muted mt-8" id="gantt-note"></p></div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2>How MedOS decides who goes next</h2></div>
+      <div class="card-body stack">
+        <div class="formula">priority = level points + (16 − rank) × 10 + modifiers
+         + waiting bonus (per minute, up to the limit)
+         → at least 1450 if a consultation was paused for an emergency
+         + 5000 when the emergency button is pressed
+
+level points: Critical 1500 · High 600 · Medium 300 · Low 0</div>
+        <ul class="prose">
+          <li><b>First come, first served</b> takes everyone in arrival order: a heart attack waits behind a routine check-up.</li>
+          <li><b>Priority</b> sees the sickest first, but a low-priority patient can wait for ever when urgent cases keep arriving.</li>
+          <li><b>Priority + aging</b> adds points for every minute waited, so long waits rise. Critical still always goes first.</li>
+          <li><b>Pre-emptive</b> also pauses the least urgent consultation when the emergency button is pressed and every doctor is busy.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/lab.js') }}?v={{ static_v }}"></script>{% endblock %}

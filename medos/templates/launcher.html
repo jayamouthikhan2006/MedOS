@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Home{% endblock %}
+{% block body %}
+<a class="skip-link" href="#main">Skip to main content</a>
+<div class="home home-shell">
+  <header class="home-top">
+    <a class="brand" href="/"><svg width="40" height="40" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>MedOS</b><span>{{ hospital_name }}</span></span></a>
+    <span class="grow"></span>
+    <span class="live-pill" data-live><span class="live-dot"></span><span data-live-text>Connecting</span></span>
+    <button class="btn btn-ghost" id="theme-toggle-home" type="button"></button>
+  </header>
+
+  <main id="main">
+    <div class="alarm home-alarm" id="h-alarm" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      <div class="msg"><b>An emergency is being handled.</b> Staff have been alerted.</div>
+    </div>
+
+    <section class="home-hero">
+      <div class="card now-card" aria-live="polite">
+        <div>
+          <h1>Right now in the emergency department</h1>
+          <p class="muted mt-4" id="h-line">Loading the live queue…</p>
+        </div>
+        <div class="now-numbers">
+          <div><b id="h-waiting">–</b><span>patients waiting</span></div>
+          <div class="crit"><b id="h-urgent">–</b><span>critical or high</span></div>
+          <div><b id="h-docs">–</b><span>doctors on duty</span></div>
+          <div><b id="h-avg">–</b><span>average wait, minutes</span></div>
+        </div>
+        <div>
+          <p class="label">Next to see a doctor</p>
+          <div class="next-strip mt-8" id="h-next"></div>
+        </div>
+      </div>
+      <aside class="card join-card" aria-labelledby="join-h">
+        <h2 class="t-h2" id="join-h">Open on another device</h2>
+        <p class="t-small muted">Connect the laptop or phone to the same Wi-Fi as the Pi, then scan the code or type an address.</p>
+        <img id="join-qr" alt="QR code with the MedOS address">
+        <div class="stack-8" id="join-urls"></div>
+      </aside>
+    </section>
+
+    <h2 class="group">Staff workspaces</h2>
+    <div class="tiles">
+      <a class="tile" href="/reception"><span class="t-icon" data-icon="desk"></span><b>Reception</b><p>Register patients by typing or voice, see the queue, raise an emergency.</p><span class="go">Open reception<span data-icon="chevronRight"></span></span></a>
+      <a class="tile" href="/doctor"><span class="t-icon" data-icon="stetho"></span><b>Doctor</b><p>Your current patient, who's next, an AI brief, and finishing a consultation.</p><span class="go">Open doctor screen<span data-icon="chevronRight"></span></span></a>
+      <a class="tile" href="/admin"><span class="t-icon" data-icon="shield"></span><b>Admin</b><p>Waiting times, doctors, rooms, triage rules, devices, AI and settings.</p><span class="go">Open admin<span data-icon="chevronRight"></span></span></a>
+    </div>
+
+    <h2 class="group">Screens for patients</h2>
+    <div class="tiles">
+      <a class="tile" href="/display" target="_blank" rel="noopener"><span class="t-icon" data-icon="tv"></span><b>Waiting-room display</b><p>For the TV on the Pi. Calls each token aloud and shows who's next.</p><span class="go">Open in a new tab<span data-icon="external"></span></span></a>
+      <a class="tile" href="/kiosk" target="_blank" rel="noopener"><span class="t-icon" data-icon="kiosk"></span><b>Self check-in kiosk</b><p>Patients speak or type their symptoms and get a token.</p><span class="go">Open in a new tab<span data-icon="external"></span></span></a>
+      <a class="tile" href="/patient"><span class="t-icon" data-icon="user"></span><b>Track a token</b><p>A patient's place in the queue and their expected wait, on their phone.</p><span class="go">Find a token<span data-icon="chevronRight"></span></span></a>
+    </div>
+
+    <h2 class="group">Learn how it works</h2>
+    <div class="tiles">
+      <a class="tile" href="/lab"><span class="t-icon" data-icon="lab"></span><b>Scheduler Lab</b><p>Compare first-come-first-served with priority scheduling, aging and pre-emption on the same patients.</p><span class="go">Open the lab<span data-icon="chevronRight"></span></span></a>
+    </div>
+  </main>
+</div>
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { $, esc, api, createLive, bindLive, hydrateIcons, icon, toggleTheme, tokenChip, fmtDur } from "/static/js/core.js";
+  hydrateIcons();
+  bindLive();
+  const tt = $("#theme-toggle-home");
+  const paint = () => { const dark = document.documentElement.dataset.theme === "dark"; tt.innerHTML = icon(dark ? "sun" : "moon") + (dark ? "Light mode" : "Dark mode"); };
+  paint(); tt.addEventListener("click", () => { toggleTheme(); paint(); });
+
+  const store = createLive({ url: "/api/public/state" });
+  store.subscribe((s) => {
+    const st = s.stats, by = st.waiting_by_level;
+    $("#h-waiting").textContent = s.queue.length;
+    $("#h-urgent").textContent = by.critical + by.high;
+    $("#h-docs").textContent = st.doctors_on_duty;
+    $("#h-avg").textContent = st.avg_wait_today ? Math.round(st.avg_wait_today / 60) : "—";
+    $("#h-line").textContent = `${s.serving.length} patient${s.serving.length === 1 ? " is" : "s are"} with a doctor, ${st.completed_today} seen today. The most urgent are always seen first.`;
+    $("#h-next").innerHTML = s.queue.slice(0, 6).map((q) => tokenChip(q.token, q.level, q.eta == null ? "Token" : "~" + fmtDur(q.eta, { short: true }))).join("") || `<span class="muted">No one is waiting.</span>`;
+    $("#h-alarm").classList.toggle("on", !!s.alert_active);
+  });
+
+  const net = await api("network");
+  const primary = net.urls.find((u) => !u.includes("127.0.0.1")) || net.current;
+  const qr = $("#join-qr");
+  qr.src = "/api/qr?data=" + encodeURIComponent(primary);
+  qr.onerror = () => qr.remove();
+  $("#join-urls").innerHTML = [...new Set([...net.urls, "http://" + net.mdns])].map((u) => `<code>${esc(u)}</code>`).join("");
+</script>
+{% endblock %}

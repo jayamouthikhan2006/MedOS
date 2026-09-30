@@ -1,0 +1,7 @@
+Flask>=2.3
+segno>=1.5
+psutil>=5.9
+# Raspberry Pi only (installed by deploy/install.sh):
+#   vosk        offline speech recognition for the USB microphone
+#   gpiozero + lgpio come from apt (python3-gpiozero, python3-lgpio)
+faster-whisper>=1.0   # accurate offline speech-to-text (downloads its model once)

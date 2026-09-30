@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Check in{% endblock %}
+{% block force_theme %}"light"{% endblock %}
+{% block body %}
+<div class="ks">
+  <header class="ks-top">
+    <span class="brand"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>Self check-in</b><span>{{ hospital_name }}</span></span></span>
+  </header>
+
+  <ol class="stepper" id="stepper" aria-label="Check-in steps">
+    <li data-step="1"><span class="n">1</span><span class="lbl">Tell us what's wrong</span></li>
+    <li data-step="2"><span class="n">2</span><span class="lbl">Check your details</span></li>
+    <li data-step="3"><span class="n">3</span><span class="lbl">Get your token</span></li>
+  </ol>
+
+  <main class="ks-stage" id="stage" aria-live="polite"></main>
+
+  <footer class="ks-foot">
+    <p><b>Chest pain, trouble breathing, heavy bleeding or someone collapsed?</b> Don't wait in line.</p>
+    <button class="btn btn-danger" id="sos" type="button" data-icon="siren">Get help now</button>
+  </footer>
+</div>
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { $, $$, esc, api, icon, hydrateIcons, modal, prio, tokenChip, LEVEL_TARGET, fmtDur, toastError } from "/static/js/core.js";
+  import { voiceCapabilities, preferredModes, listen } from "/static/js/voice.js";
+  hydrateIcons();
+  const stage = $("#stage");
+  let mode = null, resetTimer = null, lang = "en-IN";
+  (async () => { const caps = await voiceCapabilities(); mode = preferredModes(caps)[0] || null; home(); })();
+  api("/api/public/state").then((s) => { lang = s.settings.voice_lang || lang; }).catch(() => {});
+
+  function step(n) {
+    $$("#stepper li").forEach((li) => {
+      const s = +li.dataset.step;
+      li.className = s < n ? "done" : s === n ? "now" : "";
+      if (s === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    });
+  }
+
+  function home() {
+    clearTimeout(resetTimer); step(1);
+    stage.innerHTML = `
+      <h1 class="ks-h">Tell us what's wrong.</h1>
+      <p class="ks-sub">${mode ? "Tap the microphone and say your name, your age and how you feel. For example: “I'm Priya, 34, I've had a high fever since yesterday.”" : "Type your details and we'll give you a token."}</p>
+      <div class="ks-row">
+        ${mode ? `<div><button class="ks-mic" id="mic" type="button" aria-label="Start speaking">${icon("mic")}</button><p class="ks-heard strong" style="text-align:center;font-size:18px;margin-top:12px">Tap to speak</p></div>` : ""}
+        <button class="btn btn-lg" id="type" type="button">${icon("keyboard")}Type instead</button>
+      </div>`;
+    const mic = $("#mic"); if (mic) mic.onclick = startVoice;
+    $("#type").onclick = () => confirmForm({});
+  }
+
+  async function startVoice() {
+    stage.innerHTML = `
+      <h1 class="ks-h">Listening…</h1>
+      <div class="ks-row"><button class="ks-mic rec" id="mic" type="button" aria-label="Stop listening">${icon("mic")}</button>
+      <p class="ks-heard" id="heard">Speak now. Stop talking when you're done.</p></div>`;
+    const s = listen({ mode, lang, onPartial: (t) => { const h = $("#heard"); if (h) h.textContent = t; } });
+    $("#mic").onclick = () => s.stop();
+    try { const r = await s.promise; confirmForm({ ...r.fields, symptoms: r.fields.symptoms || r.text }); }
+    catch (e) {
+      stage.innerHTML = `<h1 class="ks-h">Sorry, we didn't catch that.</h1><p class="ks-sub">${esc(e.message)}</p>
+        <div class="ks-row"><button class="btn btn-primary btn-lg" id="again" type="button">${icon("mic")}Try again</button><button class="btn btn-lg" id="type" type="button">${icon("keyboard")}Type instead</button></div>`;
+      $("#again").onclick = startVoice; $("#type").onclick = () => confirmForm({});
+    }
+  }
+
+  function confirmForm(f) {
+    step(2);
+    stage.innerHTML = `
+      <h1 class="ks-h">Please check your details.</h1>
+      <form class="fields" id="form" autocomplete="off" novalidate>
+        <div class="field span-4"><label for="k-name">Your name</label><input class="input" id="k-name" value="${esc(f.name || "")}"></div>
+        <div class="field span-2"><label for="k-age">Age</label><input class="input num" id="k-age" inputmode="numeric" value="${esc(f.age || "")}"></div>
+        <div class="field span-6"><label for="k-sym">What's wrong <span class="req">*</span></label><textarea class="textarea" id="k-sym" aria-describedby="k-err">${esc(f.symptoms || "")}</textarea><p class="error-text hidden" id="k-err" role="alert">Please tell us what's wrong.</p></div>
+        <div class="field span-3"><span class="label" id="k-sex-l">Sex</span><div class="segmented block" id="k-sex" role="group" aria-labelledby="k-sex-l">${["female", "male", "other"].map((x) => `<button type="button" data-v="${x}" aria-pressed="${f.sex === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join("")}</div></div>
+        <div class="field span-3"><label for="k-phone">Phone (optional)</label><input class="input num" id="k-phone" type="tel" inputmode="tel" value="${esc(f.phone || "")}"></div>
+      </form>
+      <div class="ks-row"><button class="btn btn-primary btn-lg" id="go" type="button">${icon("check")}Get my token</button><button class="btn btn-lg" id="over" type="button">${icon("arrowLeft")}Start again</button></div>`;
+    let sex = f.sex || "";
+    $("#k-sex").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; sex = b.dataset.v; $$("#k-sex button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); };
+    $("#over").onclick = home;
+    $("#go").onclick = async () => {
+      const body = { name: $("#k-name").value, age: $("#k-age").value, sex, phone: $("#k-phone").value, symptoms: $("#k-sym").value, pregnant: !!f.pregnant };
+      if (!body.symptoms.trim()) { $("#k-err").classList.remove("hidden"); return $("#k-sym").focus(); }
+      $("#go").disabled = true;
+      try { ticket(await api("kiosk/register", { method: "POST", body })); } catch (e) { toastError(e); $("#go").disabled = false; }
+    };
+    if (!f.symptoms) $("#k-name").focus();
+  }
+
+  function ticket(t) {
+    step(3);
+    const url = `${location.origin}/p/${t.code}`;
+    stage.innerHTML = `
+      <div class="ks-ticket">
+        ${tokenChip(t.token, t.level, "Your token")}
+        <div class="stack">
+          <h1 class="ks-h">${t.status === "in_consultation" ? `Please go to ${esc(t.room || "the desk")} now.` : "Please take a seat."}</h1>
+          <div class="row wrap gap-8">${prio(t.level, { lg: true })}<span class="strong text-2">${LEVEL_TARGET[t.level]}</span></div>
+          <p class="ks-sub">${t.status === "in_consultation" ? "A doctor is ready for you." : `You are number ${t.position} in line${t.eta != null ? `, about ${fmtDur(t.eta)}` : ""}. Watch the screen, or scan the code to follow your place on your phone.`}</p>
+        </div>
+        <img src="/api/qr?data=${encodeURIComponent(url)}" alt="QR code to follow your token on your phone" onerror="this.remove()">
+      </div>
+      <p class="muted">The sickest patients are always seen first, so your place can change.</p>
+      <div><button class="btn btn-primary btn-lg" id="done" type="button">${icon("check")}Done</button></div>`;
+    $("#done").onclick = home;
+    resetTimer = setTimeout(home, 45000);
+  }
+
+  $("#sos").addEventListener("click", async () => {
+    const ok = await modal({
+      title: "Call for help now?",
+      body: `<p class="ks-sub">Staff are alerted straight away and you'll be taken to a doctor first.</p>`,
+      actions: [{ label: "Cancel", kind: "ghost", value: false }, { label: "Yes, get help", kind: "danger", value: true }],
+    });
+    if (!ok) return;
+    try {
+      const r = await api("kiosk/emergency", { method: "POST", body: {} });
+      step(3);
+      stage.innerHTML = `<h1 class="ks-h" style="color:var(--danger-text)">Help is coming.</h1><p class="ks-sub">Staff have been alerted. Please stay here.</p><div>${tokenChip(r.token, "critical", "Your token")}</div>`;
+      resetTimer = setTimeout(home, 60000);
+    } catch (e) { toastError(e); }
+  });
+</script>
+{% endblock %}

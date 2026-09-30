@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Waiting room{% endblock %}
+{% block force_theme %}"dark"{% endblock %}
+{% block body %}
+<div class="tv">
+  <header class="tv-top">
+    <span class="brand"><svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>{{ hospital_name }}</b><span>Emergency department</span></span></span>
+    <span class="tv-alert" id="tv-alert" hidden>Emergency in progress</span>
+    <span class="tv-clock" id="clock"></span>
+  </header>
+  <main class="tv-body">
+    <section class="tv-panel tv-call" id="call" aria-live="assertive"><span class="idle">Please wait to be called</span></section>
+    <aside class="tv-side">
+      <section class="tv-panel"><h2>Doctors and their patients</h2><div class="tv-serving" id="serving"></div></section>
+      <section class="tv-panel"><h2>Next to be called</h2><div class="tv-next" id="next"></div></section>
+      <section class="tv-panel tv-stats" id="stats"></section>
+    </aside>
+  </main>
+  <footer class="tv-foot">
+    <div class="tv-ticker" id="ticker"></div>
+    <div class="tv-qr"><img id="qr" alt=""><span>Scan to follow<br>your token</span></div>
+  </footer>
+</div>
+<div class="tv-emergency" id="emergency" role="alert"><div><b>Emergency</b><p>A critical patient is being treated now. Please keep the corridors clear. Waiting times may change.</p></div></div>
+<div class="tv-sound" id="sound"><button class="btn" type="button">Click anywhere to turn on announcements</button></div>
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { $, esc, createLive, startClock, chime, speak, spokenToken, audio, siren } from "/static/js/core.js";
+  startClock($("#clock"));
+  let soundOn = false, settings = {};
+  const unlock = () => { const a = audio(); soundOn = !!a && a.state === "running"; if (soundOn && $("#sound")) $("#sound").remove(); };
+  document.addEventListener("pointerdown", unlock);
+  setTimeout(() => { const a = audio(); if (a && a.state === "running") { soundOn = true; if ($("#sound")) $("#sound").remove(); } }, 800);
+
+  const queue = [];
+  let speaking = false;
+  function showCall(c, label) {
+    const el = $("#call");
+    el.dataset.level = c.level;
+    el.innerHTML = `<span class="lbl">${label}</span><span class="tok">${esc(c.token)}</span><span class="where">${esc(c.room || "Consultation desk")}</span><span class="who">${esc(c.doctor || "")}</span>`;
+    return el;
+  }
+  function announce(c) {
+    const el = showCall(c, c.recall ? "Calling again" : "Now calling");
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    if (soundOn && settings.announce !== false) {
+      chime();
+      setTimeout(() => speak(`Token ${spokenToken(c.token)}, please go to ${c.room || "the consultation desk"}.`, settings.voice_lang || "en-IN"), 1400);
+    }
+  }
+  function pump() {
+    if (speaking || !queue.length) return;
+    speaking = true; announce(queue.shift());
+    setTimeout(() => { speaking = false; pump(); }, 7000);
+  }
+  let emTimer = null;
+  const store = createLive({
+    url: "/api/public/state",
+    onEvent(kind, data) {
+      if (kind === "called") { queue.push(data); pump(); }
+      if (kind === "emergency") {
+        $("#emergency").classList.add("on");
+        if (soundOn) siren(true);
+        clearTimeout(emTimer);
+        emTimer = setTimeout(() => { $("#emergency").classList.remove("on"); siren(false); }, 9000);
+      }
+    },
+  });
+  let first = true;
+  store.subscribe((s) => {
+    settings = s.settings;
+    if (first && s.recent_calls.length && !speaking) showCall(s.recent_calls.find((x) => x.status === "in_consultation") || s.recent_calls[0], "Last called");
+    first = false;
+    $("#serving").innerHTML = s.serving.map((p) => `<div data-level="${p.level}"><b>${esc(p.token)}</b><span class="doc"><strong>${esc(p.room || "Desk")}</strong><span>${esc(p.doctor || "")}</span></span></div>`).join("") || `<span style="color:#94a3b8">No one right now</span>`;
+    $("#next").innerHTML = s.queue.slice(0, 10).map((p) => `<span data-level="${p.level}">${esc(p.token)}</span>`).join("") || `<span style="box-shadow:none;background:none;font-family:inherit;font-size:1.6vw;color:#94a3b8">No one waiting</span>`;
+    const st = s.stats;
+    $("#stats").innerHTML = `<div><b>${st.waiting}</b><span>waiting</span></div>
+      <div><b>${st.avg_wait_today ? Math.round(st.avg_wait_today / 60) : "—"}</b><span>minutes average wait</span></div>
+      <div><b>${st.doctors_on_duty}</b><span>doctors on duty</span></div>`;
+    $("#ticker").textContent = s.settings.display_message || "";
+    $("#tv-alert").hidden = !s.alert_active;
+    document.title = s.alert_active ? "Emergency · Waiting room" : "Waiting room";
+  });
+  const qr = $("#qr");
+  qr.src = "/api/qr?data=" + encodeURIComponent(location.origin + "/patient");
+  qr.onerror = () => qr.parentElement.remove();
+</script>
+{% endblock %}

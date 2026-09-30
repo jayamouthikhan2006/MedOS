@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Your place in the queue{% endblock %}
+{% block body %}
+<div class="pt">
+  <header class="pt-top">
+    <a class="brand" href="/patient"><svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span><b>MedOS</b><span>{{ hospital_name }}</span></span></a>
+    <button class="btn btn-sm hidden" id="alert-btn" type="button" data-icon="bell">Alert me</button>
+  </header>
+
+  <section class="card pt-lookup {% if code %}hidden{% endif %}" id="lookup" aria-labelledby="lookup-h">
+    <h1 class="t-h1" id="lookup-h">Find your place in the queue</h1>
+    <form class="stack" id="lookup-form">
+      <div class="field"><label for="tok">Token number on your slip</label><input class="input num" id="tok" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="017" aria-describedby="lookup-err"></div>
+      <p class="error-text" id="lookup-err" role="alert"></p>
+      <button class="btn btn-primary btn-lg btn-block" type="submit">Show my place</button>
+    </form>
+  </section>
+
+  <main class="stack {% if not code %}hidden{% endif %}" id="main" aria-live="polite">
+    <section class="card pt-token-card">
+      <span id="p-token"></span>
+      <div class="stack-8">
+        <span id="p-level"></span>
+        <span class="t-small muted" id="p-target"></span>
+      </div>
+    </section>
+    <div id="p-status" class="stack"></div>
+    <section class="card"><div class="card-head"><h2>Your visit</h2></div><div class="card-body"><ol class="pt-steps" id="p-steps"></ol></div></section>
+    <section class="card"><div class="card-head"><h2>With a doctor now</h2></div><div class="card-body next-strip" id="p-serving"></div></section>
+    <p class="t-small muted" id="p-foot"></p>
+  </main>
+</div>
+{% endblock %}
+{% block scripts %}
+<script type="module">
+  import { $, esc, api, createLive, icon, hydrateIcons, prio, tokenChip, LEVEL_TARGET, fmtDur, fmtClock, chime, softPing, audio } from "/static/js/core.js";
+  hydrateIcons();
+  const code = {{ code|tojson }};
+
+  $("#lookup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const t = $("#tok").value.trim();
+    if (!t) { $("#lookup-err").textContent = "Type the number printed on your token slip."; return $("#tok").focus(); }
+    try { const r = await api(`token/${encodeURIComponent(t)}`); location.href = `/p/${r.code}`; }
+    catch (err) { $("#lookup-err").textContent = err.message; }
+  });
+  if (!code) $("#tok").focus(); else start();
+
+  function start() {
+    let armed = false, notifiedNear = false, notifiedCall = false, callLoop = null, lastStatus = null;
+    const btn = $("#alert-btn");
+    btn.classList.remove("hidden");
+    btn.addEventListener("click", async () => {
+      audio(); softPing(); armed = true;
+      if (navigator.vibrate) navigator.vibrate(120);
+      if ("Notification" in window && Notification.permission === "default") { try { await Notification.requestPermission(); } catch { /* denied */ } }
+      btn.innerHTML = `${icon("check")}Alerts on`; btn.classList.add("btn-primary");
+    });
+    const notify = (title, body) => {
+      if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 600]);
+      if (armed) chime();
+      try { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body, tag: "medos-" + code }); } catch { /* unsupported */ }
+      document.title = "● " + title;
+    };
+    const store = createLive({ url: `/api/p/${code}` });
+    store.subscribe((p) => {
+      $("#p-token").innerHTML = tokenChip(p.token, p.level, "Your token");
+      $("#p-level").innerHTML = prio(p.level, { lg: true, text: `${({ critical: "Critical", high: "High", medium: "Medium", low: "Low" })[p.level]} priority` });
+      $("#p-target").textContent = p.emergency ? "Emergency: you are being seen first" : LEVEL_TARGET[p.level];
+      const near = p.status === "waiting" && p.ahead != null && p.ahead < (p.settings.notify_ahead || 2);
+      let html = "";
+      if (p.status === "waiting") {
+        html = `<div class="pt-numbers">
+            <div class="stat"><span class="label">${icon("users")}People ahead of you</span><span class="value">${p.ahead}</span></div>
+            <div class="stat"><span class="label">${icon("clock")}Expected wait</span><span class="value">${p.eta == null ? "—" : p.eta < 45 ? "Any moment" : "~" + fmtDur(p.eta)}</span></div>
+          </div>
+          ${p.eta == null ? `<div class="pt-note info">${icon("info")}<div>No doctor is on duty right now. Your wait starts when one arrives.</div></div>` : ""}
+          ${near ? `<div class="pt-note near">${icon("bell")}<div><b>Almost your turn.</b> Please stay near the consultation rooms.</div></div>` : ""}
+          ${p.preempted ? `<div class="pt-note info">${icon("info")}<div>Your doctor was called to an emergency. You'll be seen next.</div></div>` : ""}`;
+      } else if (p.status === "in_consultation") {
+        html = `<div class="pt-called" role="alert"><span>Please go to</span><b>${esc(p.room || "the consultation desk")}</b><span>${esc(p.doctor || "The doctor")} is ready for you.</span></div>`;
+      } else if (p.status === "completed") {
+        html = `<div class="card card-body stack-8"><span class="badge ok">${icon("check")}Visit complete</span><p>Outcome: <b>${esc(p.outcome || "Treated")}</b> at ${fmtClock(p.completed_at)}. Take care.</p></div>`;
+      } else {
+        html = `<div class="card card-body stack-8"><span class="badge">${icon("info")}Token closed</span><p>Please speak to the reception desk if you still need to be seen.</p></div>`;
+      }
+      $("#p-status").innerHTML = html;
+      const reached = { waiting: 2, in_consultation: 4, completed: 5 }[p.status] || 1;
+      const steps = [["Registered", fmtClock(p.arrived_at)], ["Waiting", ""], ["Almost your turn", ""], ["Called to a room", p.called_at ? fmtClock(p.called_at) : ""], ["Visit complete", p.completed_at ? fmtClock(p.completed_at) : ""]];
+      const now = near ? 3 : reached;
+      $("#p-steps").innerHTML = steps.map(([t, when], i) => `<li class="${i + 1 < now || (i + 1 === now && p.status === "completed") ? "done" : i + 1 === now ? "now" : ""}"><span>${t}</span><span class="t-small muted">${when}</span></li>`).join("");
+      $("#p-serving").innerHTML = p.serving.length ? p.serving.map((s) => `<span class="row gap-8">${tokenChip(s.token, s.level)}<span class="t-small">${esc(s.room || "")}</span></span>`).join("") : `<span class="muted">No one right now.</span>`;
+      $("#p-foot").textContent = p.status === "waiting" ? `Keep this page open. Press "Alert me" and your phone will ring when ${p.settings.notify_ahead || 2} or fewer people are ahead. The sickest patients are always seen first, so your place can change.` : "";
+
+      if (near && !notifiedNear) { notifiedNear = true; notify("Almost your turn", `Token ${p.token}: please stay near the consultation rooms.`); }
+      if (p.status === "in_consultation" && lastStatus !== "in_consultation" && !notifiedCall) {
+        notifiedCall = true; notify(`Go to ${p.room || "the desk"}`, `Token ${p.token}: ${p.doctor || "the doctor"} is ready for you.`);
+        clearInterval(callLoop); let n = 0;
+        callLoop = setInterval(() => { if (++n > 4) return clearInterval(callLoop); if (armed) chime(); if (navigator.vibrate) navigator.vibrate(400); }, 6000);
+      }
+      if (p.status !== "in_consultation") { notifiedCall = false; clearInterval(callLoop); }
+      if (p.status === "waiting" && !near) notifiedNear = false;
+      lastStatus = p.status;
+    });
+  }
+</script>
+{% endblock %}

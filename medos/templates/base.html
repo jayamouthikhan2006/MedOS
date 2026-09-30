@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e7490">
+  <title>{% block title %}MedOS{% endblock %} · {{ hospital_name }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="preload" href="{{ url_for('static', filename='fonts/atkinson-next.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/ui.css') }}?v={{ static_v }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}?v={{ static_v }}">
+  <script type="importmap">{"imports": {
+    "/static/js/core.js": "/static/js/core.js?v={{ static_v }}",
+    "/static/js/voice.js": "/static/js/voice.js?v={{ static_v }}"
+  }}</script>
+  {% block head %}{% endblock %}
+  <script>
+    (function () {
+      var t = {% block force_theme %}null{% endblock %};
+      try { t = t || localStorage.getItem("medos-theme"); } catch (e) {}
+      document.documentElement.dataset.theme = t || "light";
+    })();
+  </script>
+</head>
+<body class="page-{{ page }}">
+{% block body %}
+<a class="skip-link" href="#content">Skip to main content</a>
+{% set logo %}<svg width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0e7490"/><path d="M4 17h6.2l2-5.2 3.6 10.4 2.6-7.4 1.4 2.2H28" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endset %}
+<div class="app">
+  <nav class="sidebar" id="sidebar" aria-label="Main navigation">
+    <a class="brand" href="/">{{ logo }}<span><b>MedOS</b><span>{{ hospital_name }}</span></span></a>
+
+    <div class="nav-group">
+      <span class="nav-label">Workspace</span>
+      <a class="nav-link" href="/" data-icon="home" {% if page == 'home' %}aria-current="page"{% endif %}>Home</a>
+      <a class="nav-link" href="/reception" data-icon="desk" {% if page == 'reception' %}aria-current="page"{% endif %}>Reception</a>
+      <a class="nav-link" href="/doctor" data-icon="stetho" {% if page == 'doctor' %}aria-current="page"{% endif %}>Doctor</a>
+      <a class="nav-link" href="/admin" data-icon="shield" {% if page == 'admin' %}aria-current="page"{% endif %}>Admin</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Screens for patients</span>
+      <a class="nav-link" href="/display" target="_blank" rel="noopener" data-icon="tv">Waiting-room display<span class="ext" data-icon="external"></span></a>
+      <a class="nav-link" href="/kiosk" target="_blank" rel="noopener" data-icon="kiosk">Self check-in kiosk<span class="ext" data-icon="external"></span></a>
+      <a class="nav-link" href="/patient" data-icon="user" {% if page == 'patient' %}aria-current="page"{% endif %}>Track a token</a>
+    </div>
+    <div class="nav-group">
+      <span class="nav-label">Learn</span>
+      <a class="nav-link" href="/lab" data-icon="lab" {% if page == 'lab' %}aria-current="page"{% endif %}>Scheduler Lab</a>
+    </div>
+
+    <div class="sidebar-foot">
+      {% if role %}
+      <div class="who"><span class="avatar" aria-hidden="true">{{ role[0]|upper }}</span><span><b>{{ role|capitalize }}</b><span>Signed in</span></span></div>
+      {% endif %}
+      <button class="nav-link" id="theme-toggle" type="button"></button>
+      {% if role %}<a class="nav-link" href="/logout" data-icon="logout">Sign out</a>{% endif %}
+    </div>
+  </nav>
+
+  <div class="main">
+    <div class="mobilebar">
+      <button class="icon-btn" id="menu-btn" type="button" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
+      <a class="brand" href="/">{{ logo }}<span><b>MedOS</b></span></a>
+      <span class="grow"></span>
+      <span class="live-pill" data-live><span class="live-dot"></span><span data-live-text>Connecting</span></span>
+    </div>
+
+    <div class="alarm" id="alarm" role="alert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      <div class="msg"></div>
+      <button class="btn btn-sm" type="button" data-ack>Acknowledge</button>
+    </div>
+
+    <header class="page-head">
+      <div class="titles">
+        <h1>{% block heading %}MedOS{% endblock %}</h1>
+        <p>{% block subheading %}{% endblock %}</p>
+      </div>
+      <div class="page-actions">
+        {% block actions %}{% endblock %}
+        <span class="live-pill hide-mobile" data-live><span class="live-dot"></span><span data-live-text>Connecting</span></span>
+      </div>
+    </header>
+
+    <main class="content" id="content" tabindex="-1">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
