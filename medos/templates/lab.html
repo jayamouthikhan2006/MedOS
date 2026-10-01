@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Scheduler Lab{% endblock %}
 {% block heading %}Scheduler Lab{% endblock %}
-{% block subheading %}Run the same patients through four scheduling methods and compare who waits, and for how long.{% endblock %}
+{% block subheading %}Run the same patients through five scheduling methods and compare who waits, and for how long.{% endblock %}
 {% block content %}
 <div class="lab-grid">
   <aside class="card lab-controls" aria-labelledby="lab-set-h">
@@ -35,6 +35,16 @@
       <div class="card-body"><div class="gantt" id="gantt"></div><p class="t-small muted mt-8" id="gantt-note"></p></div>
     </section>
     <section class="card">
+      <div class="card-head"><h2>Where each algorithm is used in MedOS</h2></div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th scope="col">Part of the hospital</th><th scope="col">Algorithm</th><th scope="col">Why it fits</th><th scope="col">Open it</th></tr></thead>
+        <tbody>
+          <tr><td><b>Pharmacy orders</b></td><td>First come, first served</td><td class="t-small">Preparing medicines takes about the same time for everyone and no order is more urgent, so arrival order is the fairest.</td><td><a class="btn btn-sm" href="/pharmacy">Pharmacy</a></td></tr>
+          <tr><td><b>Doctor treatment</b></td><td>Priority scheduling with aging and pre-emption</td><td class="t-small">The sickest must be seen first; aging stops long waits; the emergency button interrupts.</td><td><a class="btn btn-sm" href="/reception">Reception</a></td></tr>
+          <tr><td><b>Hospital choice for ambulance, emergency and non-emergency cases</b></td><td>Shortest job first (with aging)</td><td class="t-small">The hospital with the shortest time to treatment (drive + wait) wins. Ambulances take emergencies first, then the shortest trip; long waits move up.</td><td><a class="btn btn-sm" href="/ambulance">Ambulance desk</a></td></tr>
+        </tbody></table></div>
+    </section>
+    <section class="card">
       <div class="card-head"><h2>How MedOS decides who goes next</h2></div>
       <div class="card-body stack">
         <div class="formula">priority = level points + (16 − rank) × 10 + modifiers
@@ -45,6 +55,7 @@
 level points: Critical 1500 · High 600 · Medium 300 · Low 0</div>
         <ul class="prose">
           <li><b>First come, first served</b> takes everyone in arrival order: a heart attack waits behind a routine check-up.</li>
+          <li><b>Shortest job first</b> takes the quickest consultations first. The average wait drops, but a critical patient with a long consultation waits: right for ambulance trips, wrong for doctors.</li>
           <li><b>Priority</b> sees the sickest first, but a low-priority patient can wait for ever when urgent cases keep arriving.</li>
           <li><b>Priority + aging</b> adds points for every minute waited, so long waits rise. Critical still always goes first.</li>
           <li><b>Pre-emptive</b> also pauses the least urgent consultation when the emergency button is pressed and every doctor is busy.</li>

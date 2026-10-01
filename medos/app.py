@@ -17,6 +17,8 @@ PAGES = {
     "reception": ("Reception desk", ("reception",)),
     "doctor": ("Doctor", ("doctor",)),
     "admin": ("Admin", ()),
+    "pharmacy": ("Pharmacy", ("pharmacy", "reception", "doctor")),
+    "ambulance": ("Ambulance desk", ("reception", "doctor")),
 }
 
 
@@ -63,7 +65,8 @@ def create_app(start_background: bool = True) -> Flask:
 
     def staff_page(page: str):
         if not allowed(page):
-            return redirect(url_for("login", role=page if page != "admin" else "admin", next=request.path))
+            want = {"ambulance": "reception"}.get(page, page)
+            return redirect(url_for("login", role=want, next=request.path))
         return render_template("%s.html" % page, page=page)
 
     @app.get("/reception")
@@ -77,6 +80,14 @@ def create_app(start_background: bool = True) -> Flask:
     @app.get("/admin")
     def admin():
         return staff_page("admin")
+
+    @app.get("/pharmacy")
+    def pharmacy_page():
+        return staff_page("pharmacy")
+
+    @app.get("/ambulance")
+    def ambulance_page():
+        return staff_page("ambulance")
 
     @app.get("/patient")
     def patient_lookup():

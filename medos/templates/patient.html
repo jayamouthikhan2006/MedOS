@@ -25,6 +25,7 @@
       </div>
     </section>
     <div id="p-status" class="stack"></div>
+    <section class="card pt-pharm hidden" id="p-pharm" aria-live="polite"></section>
     <section class="card"><div class="card-head"><h2>Your visit</h2></div><div class="card-body"><ol class="pt-steps" id="p-steps"></ol></div></section>
     <section class="card"><div class="card-head"><h2>With a doctor now</h2></div><div class="card-body next-strip" id="p-serving"></div></section>
     <p class="t-small muted" id="p-foot"></p>
@@ -89,6 +90,13 @@
       const steps = [["Registered", fmtClock(p.arrived_at)], ["Waiting", ""], ["Almost your turn", ""], ["Called to a room", p.called_at ? fmtClock(p.called_at) : ""], ["Visit complete", p.completed_at ? fmtClock(p.completed_at) : ""]];
       const now = near ? 3 : reached;
       $("#p-steps").innerHTML = steps.map(([t, when], i) => `<li class="${i + 1 < now || (i + 1 === now && p.status === "completed") ? "done" : i + 1 === now ? "now" : ""}"><span>${t}</span><span class="t-small muted">${when}</span></li>`).join("");
+      const ph = p.pharmacy, box = $("#p-pharm");
+      box.classList.toggle("hidden", !ph || ph.status === "cancelled");
+      if (ph) box.innerHTML = ph.status === "ready"
+        ? `<div class="pt-note near">${icon("check")}<div><b>Your medicines are ready.</b> Please collect them at the pharmacy counter.</div></div>`
+        : ph.status === "collected" ? `<p class="row gap-8">${icon("check")}Medicines collected. Take care.</p>`
+        : ph.status === "preparing" ? `<p><b>Pharmacy:</b> your medicines are being prepared now.</p>`
+        : `<p><b>Pharmacy:</b> number ${ph.position ?? "?"} in the medicines queue, about ${Math.round((ph.eta_min ?? 0) + 4)} min. Orders are prepared in the order they arrive.</p>`;
       $("#p-serving").innerHTML = p.serving.length ? p.serving.map((s) => `<span class="row gap-8">${tokenChip(s.token, s.level)}<span class="t-small">${esc(s.room || "")}</span></span>`).join("") : `<span class="muted">No one right now.</span>`;
       $("#p-foot").textContent = p.status === "waiting" ? `Keep this page open. Press "Alert me" and your phone will ring when ${p.settings.notify_ahead || 2} or fewer people are ahead. The sickest patients are always seen first, so your place can change.` : "";
 

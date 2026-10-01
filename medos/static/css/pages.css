@@ -430,3 +430,42 @@ details.why .reasons { margin-top: 4px; }
 .doc-tab[aria-pressed="true"] { border-color: var(--primary); background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
 .doc-tab b { display: block; font-size: 15px; }
 .doc-tab small { display: block; color: var(--muted); font-size: 13px; }
+
+/* ================================================================== pharmacy (FCFS) and ambulance desk (SJF) */
+.ph-grid, .am-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+@container content (min-width: 960px) {
+  .ph-grid { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .am-grid { grid-template-columns: minmax(340px, 440px) minmax(0, 1fr); }
+}
+.ph-grid > *, .am-grid > * { min-width: 0; }
+.ph-grid .card, .am-grid .card { container-type: inline-size; }
+.prow.ph, .prow.ph2, .prow.am, .prow.am2, .list-head.ph { cursor: default; }
+.list-head.ph, .prow.ph { grid-template-columns: 28px 72px minmax(0, 1fr) 84px 84px auto; }
+.prow.ph2 { grid-template-columns: 72px minmax(0, 1fr) auto auto; }
+.prow.am { grid-template-columns: 28px minmax(0, 1fr) 88px 110px auto; }
+.prow.am2 { grid-template-columns: minmax(0, 1fr) auto auto; }
+.prow.first { background: var(--primary-soft); }
+.prow .who-cell .line + .line { font-size: 13px; }
+.prow.done-row { opacity: .75; }
+@container (max-width: 560px) {
+  .list-head.ph { display: none; }
+  .prow.ph { grid-template-columns: 64px minmax(0, 1fr) auto; }
+  .prow.ph .pos { display: none; }
+  .prow.ph > :nth-child(n+4) { grid-column: 2 / -1; }
+  .prow.am { grid-template-columns: minmax(0, 1fr) auto; }
+  .prow.am .pos { display: none; }
+  .prow.am2, .prow.ph2 { grid-template-columns: minmax(0, 1fr) auto; }
+}
+.hosp-rank { display: flex; flex-direction: column; gap: 8px; }
+.hosp-opt { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; background: var(--surface); }
+.hosp-opt b { display: block; }
+.hosp-opt .t-small { display: block; }
+.hosp-opt input { width: 18px; height: 18px; accent-color: var(--primary); flex: none; }
+.hosp-opt:has(input:checked) { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: var(--primary-soft); }
+.hosp-opt.off { opacity: .55; cursor: not-allowed; background: var(--surface-2); }
+.hosp-opt .time { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hosp-opt .time span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+.am-fleet { display: flex; flex-wrap: wrap; gap: 8px; }
+.pt-pharm { padding: 16px; }
+.tv-pharm { display: flex; align-items: center; gap: .8vw; font-size: 1.4vw; color: #cbd5e1; }
+.tv-pharm b { font-family: var(--font-sign); font-size: 2.4vw; color: #4ade80; }

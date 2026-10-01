@@ -388,7 +388,7 @@ class Scheduler:
         return self.doctor(doctor_id)
 
     def finish(self, doctor_id: int, outcome: str = "", notes: str = "",
-               next_status: str = "available") -> Dict[str, Any]:
+               next_status: str = "available", medicines: str = "") -> Dict[str, Any]:
         if next_status not in ("available", "break", "off_duty"):
             next_status = "available"
         with self.lock:
@@ -407,6 +407,9 @@ class Scheduler:
                 p["token"], d["name"], consult // 60, outcome or "Treated"), p["id"])
             self._durations_cache = None
             self.dispatch(reason="finish")
+        if (medicines or "").strip():
+            from . import pharmacy   # prescriptions go to the FCFS pharmacy queue
+            pharmacy.create_order(medicines, p["id"], p["token"], p["name"], d["name"])
         bus.publish("queue", {"reason": "finish", "patient_id": p["id"]})
         bus.publish("doctors", {"doctor_id": doctor_id})
         return p

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Pharmacy{% endblock %}
+{% block heading %}Pharmacy{% endblock %}
+{% block subheading %}Medicines are prepared in the order prescriptions arrive: first come, first served.{% endblock %}
+{% block actions %}
+<button class="btn btn-primary btn-lg" id="start-next" type="button" data-icon="play">Start next order</button>
+{% endblock %}
+{% block content %}
+<section class="stats" id="ph-stats" aria-label="Pharmacy right now"></section>
+
+<div class="ph-grid mt-24">
+  <div class="stack-24">
+    <section class="card" aria-labelledby="q-h">
+      <div class="card-head"><h2 id="q-h">Waiting, in order of arrival</h2><span class="badge teal">First come, first served</span></div>
+      <p class="order-note mt-16"><span data-icon="info"></span>Orders can't be skipped. "Start next order" always takes the one at the top.</p>
+      <div class="list" id="ph-queue"></div>
+    </section>
+    <section class="card" aria-labelledby="prep-h">
+      <div class="card-head"><h2 id="prep-h">Being prepared</h2></div>
+      <div class="list" id="ph-prep"></div>
+    </section>
+  </div>
+  <aside class="stack-24">
+    <section class="card" aria-labelledby="ready-h">
+      <div class="card-head"><h2 id="ready-h">Ready to collect</h2><span class="sub">shown on the waiting-room screen</span></div>
+      <div class="list" id="ph-ready"></div>
+    </section>
+    <section class="card" aria-labelledby="add-h">
+      <div class="card-head"><h2 id="add-h">Add an order at the counter</h2></div>
+      <form class="card-body stack" id="ph-add" novalidate>
+        <div class="fields">
+          <div class="field span-2"><label for="ph-token">Token <span class="muted">(optional)</span></label><input class="input num" id="ph-token" inputmode="numeric" maxlength="4"></div>
+          <div class="field span-4"><label for="ph-name">Patient name</label><input class="input" id="ph-name"></div>
+          <div class="field span-6"><label for="ph-items">Medicines <span class="req">*</span></label><textarea class="textarea" id="ph-items" placeholder="Paracetamol 500 mg, 1 tablet 3 times a day for 3 days"></textarea>
+            <p class="helper">Doctors' prescriptions arrive here by themselves. Use this for walk-in prescriptions.</p></div>
+        </div>
+        <button class="btn btn-primary" type="submit" data-icon="plus">Add to the end of the queue</button>
+      </form>
+    </section>
+    <section class="card" aria-labelledby="done-h">
+      <div class="card-head"><h2 id="done-h">Collected today</h2></div>
+      <div class="list" id="ph-done"></div>
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/pharmacy.js') }}?v={{ static_v }}"></script>{% endblock %}

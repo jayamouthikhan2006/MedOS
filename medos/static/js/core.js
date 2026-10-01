@@ -66,6 +66,10 @@ const P = {
   arrowLeft: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
   clipboard: '<rect x="5.5" y="4" width="13" height="17" rx="2"/><path d="M9 4.5h6V7H9z"/><path d="m9 14 2 2 4-4"/>',
+  pill: '<path d="M10.5 20.5 3.5 13.5a5 5 0 0 1 7-7l7 7a5 5 0 0 1-7 7z"/><path d="m8.5 8.5 7 7"/>',
+  ambulance: '<path d="M2 17V8a1 1 0 0 1 1-1h11v10"/><path d="M14 10h4l3 3.5V17h-7"/><circle cx="6.5" cy="17.5" r="2"/><circle cx="17.5" cy="17.5" r="2"/><path d="M8 9v4M6 11h4"/>',
+  hospital: '<path d="M4 21V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v16"/><path d="M2 21h20M12 8v6M9 11h6M10 21v-3h4v3"/>',
+  route: '<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8.5a3.5 3.5 0 0 0 0-7h-9a3.5 3.5 0 0 1 0-7H16"/>',
   qr: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h4v4h-4M20 14h1"/>',
 };
 
@@ -169,7 +173,7 @@ export function createLive({ url = "/api/state", onEvent } = {}) {
     if (!window.EventSource) return startPolling();
     es = new EventSource("/api/stream");
     es.addEventListener("hello", () => { failures = 0; setConnected(true); stopPolling(); refresh("hello"); });
-    ["queue", "doctors", "rooms", "called", "emergency", "alert_ack", "preempted", "settings", "tick", "log", "voice"].forEach((k) => es.addEventListener(k, (ev) => {
+    ["queue", "doctors", "rooms", "called", "emergency", "alert_ack", "preempted", "settings", "tick", "log", "voice", "pharmacy", "ambulance"].forEach((k) => es.addEventListener(k, (ev) => {
       let data = {}; try { data = JSON.parse(ev.data); } catch { /* ignore */ }
       if (onEvent) onEvent(k, data);
       document.dispatchEvent(new CustomEvent("medos:event", { detail: { kind: k, data } }));

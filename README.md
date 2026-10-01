@@ -12,6 +12,8 @@ Any laptop, tablet or phone on the same network opens MedOS in a browser. Nothin
 | **Patient** `/p/<code>` | Patients (phone) | Token number, queue position, estimated wait, **alert when it's almost their turn** |
 | **Waiting-room display** `/display` | TV on the Pi's HDMI port | Calls tokens aloud with a chime, shows who is with a doctor and who's next |
 | **Kiosk** `/kiosk` | Patients (Pi touchscreen) | Self check-in by speaking, emergency help button |
+| **Pharmacy** `/pharmacy` | Pharmacist | Prescriptions from doctors queue up **first come, first served**; start, ready, collected; patients see "ready" on the TV and their phone |
+| **Ambulance desk** `/ambulance` | Reception / ambulance staff | Picks the hospital with the **shortest time to treatment** (SJF-style) for emergency and non-emergency cases, and dispatches ambulances emergencies first, then shortest trip |
 | **Scheduler Lab** `/lab` | Students / examiners | FCFS vs Priority vs Priority + aging vs Pre-emptive on the same patients, with Gantt charts and metrics |
 
 First PINs: **staff 1111**, **admin 1234**. The admin PIN opens every screen. Change both in *Admin → Settings*.
@@ -150,6 +152,8 @@ defaults:   aging 5 points/minute, limit 450, re-ordered every 15 s
 
 | Concept | In MedOS | Watch it live |
 |---|---|---|
+| First come, first served (FCFS) | `pharmacy.py`: prescriptions join one FIFO queue; "Start next order" can only take the head | Pharmacy page; `PHARMACY` log lines |
+| Shortest job first (SJF) | `ambulance.py`: each case goes to the hospital with the shortest drive + wait; ambulances take emergencies first, then the shortest trip, with aging so long trips can't starve | Ambulance desk; `AMBULANCE` log lines |
 | Dynamic priority scheduling | `scheduler.py` `ready_queue()`: binary heap rebuilt from live scores | Reception queue order, priority bars |
 | Aging (starvation prevention) | `aging-daemon` thread re-scores every tick and logs overtakes | Hatched part of the priority bar; `AGING` lines in the kernel log |
 | Pre-emption | `_preempt_for()`: the least urgent consultation yields to an emergency | Doctor screen notice; `PREEMPT` log lines; Scheduler Lab striped blocks |

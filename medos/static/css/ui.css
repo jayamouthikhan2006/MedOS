@@ -386,7 +386,7 @@ details.disclose > .disclose-body { padding: 0 14px 14px; }
 .prow .pos { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .prow .who-cell { min-width: 0; }
 .prow .who-cell b { display: block; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.prow .who-cell .line { font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .who-cell .line { display: block; font-size: 14px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow .flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .prow .time { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .prow .time span { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }

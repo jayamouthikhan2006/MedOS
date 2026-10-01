@@ -368,11 +368,13 @@ function renderSystem(r) {
   ].join("");
   const L = r.lock, S = r.scheduler, B = r.bus, A = r.ai, H = r.hardware || {};
   const concepts = [
-    ["Dynamic priority scheduling", `${S.dispatches} patients sent to doctors by priority, not arrival order`, "chart"],
+    ["Priority scheduling: doctors", `${S.dispatches} patients sent to doctors by priority, not arrival order`, "chart"],
+    ["First come, first served: pharmacy", "Prescriptions are prepared strictly in the order they arrive; none can be skipped", "pill"],
+    ["Shortest job first: ambulance desk", "Each case goes to the hospital with the shortest time to treatment; emergencies go first, then the shortest trip", "ambulance"],
     ["Aging", `Every ${S.tick_seconds} s waiting patients gain ${S.aging_rate} points per minute (up to ${S.aging_cap})`, "clock"],
     ["Pre-emption", `${S.preemptions} consultations paused for emergencies (mode: ${S.preemption})`, "refresh"],
     ["Interrupt handling", `${S.interrupts} emergency interrupts, ${H.interrupts ?? 0} from the hardware button`, "bolt"],
-    ["Process synchronisation", `Queue lock taken ${L.acquisitions} times, ${L.contended} had to wait (longest ${L.max_wait_ms} ms)`, "lock"],
+    ["Process synchronisation", (r.locks || [L]).map((k) => `${k.name}: taken ${k.acquisitions} times, ${k.contended} waited`).join(" · "), "lock"],
     ["Producer and consumer", `AI queue: ${A.queued} waiting, ${A.processed} done, ${A.failed} failed`, "spark"],
     ["Inter-process communication", `${B.clients} screens receiving live updates, ${B.published} updates sent`, "wifi"],
     ["Memory management", `MedOS uses ${fmtBytes(s.rss)}; the speech model is ${r.voice.model_loaded ? "loaded" : "loaded only when needed"}`, "cpu"],

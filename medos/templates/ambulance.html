@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Ambulance desk{% endblock %}
+{% block heading %}Ambulance desk{% endblock %}
+{% block subheading %}Send each patient to the hospital where they'll be treated soonest, and dispatch ambulances shortest trip first.{% endblock %}
+{% block content %}
+<section class="stats" id="am-stats" aria-label="Ambulances right now"></section>
+
+<div class="am-grid mt-24">
+  <section class="card" aria-labelledby="new-h">
+    <div class="card-head"><h2 id="new-h">New ambulance request</h2></div>
+    <form class="card-body stack" id="am-form" novalidate autocomplete="off">
+      <div class="field"><span class="label" id="kind-l">Type of case</span>
+        <div class="segmented block" id="am-kind" role="group" aria-labelledby="kind-l">
+          <button type="button" data-v="emergency" aria-pressed="true">Emergency</button>
+          <button type="button" data-v="non_emergency" aria-pressed="false">Non-emergency</button>
+        </div>
+        <p class="helper" id="kind-help">Emergencies are always dispatched before non-emergency trips.</p></div>
+      <div class="fields">
+        <div class="field span-3"><label for="am-area">Pickup area</label><select class="select" id="am-area"></select></div>
+        <div class="field span-3"><label for="am-age">Age</label><input class="input num" id="am-age" inputmode="numeric" maxlength="3"></div>
+        <div class="field span-6"><label for="am-name">Patient name <span class="muted">(if known)</span></label><input class="input" id="am-name"></div>
+        <div class="field span-6"><label for="am-cond">What happened <span class="req">*</span></label>
+          <textarea class="textarea" id="am-cond" placeholder="e.g. 60 year old man, crushing chest pain and sweating"></textarea></div>
+      </div>
+      <button class="btn" type="submit" data-icon="hospital">Find the best hospital</button>
+      <div id="am-rec" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <div class="stack-24">
+    <section class="card" aria-labelledby="dq-h">
+      <div class="card-head"><h2 id="dq-h">Waiting for an ambulance</h2><span class="badge teal">Emergencies first, then shortest trip</span></div>
+      <div class="list" id="am-queue"></div>
+    </section>
+    <section class="card" aria-labelledby="ot-h">
+      <div class="card-head"><h2 id="ot-h">On the way</h2></div>
+      <div class="list" id="am-trips"></div>
+    </section>
+    <section class="card" aria-labelledby="fl-h">
+      <div class="card-head"><h2 id="fl-h">Ambulances</h2>
+        <button class="btn btn-sm btn-ghost" type="button" id="fleet-minus" data-icon="x">Remove one</button>
+        <button class="btn btn-sm" type="button" id="fleet-plus" data-icon="plus">Add one</button></div>
+      <div class="card-body am-fleet" id="am-fleet"></div>
+    </section>
+  </div>
+</div>
+
+<section class="card mt-24" aria-labelledby="hs-h">
+  <div class="card-head"><h2 id="hs-h">Hospitals</h2><span class="sub">Update free beds and waiting times when other hospitals call. This hospital's wait comes live from the queue.</span></div>
+  <div class="table-wrap"><table class="table" id="am-hosp"></table></div>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ url_for('static', filename='js/ambulance.js') }}?v={{ static_v }}"></script>{% endblock %}

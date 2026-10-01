@@ -54,7 +54,7 @@ $("#switch-doc").addEventListener("click", () => { myId = null; try { localStora
 
 // ------------------------------------------------------------------ workspace
 let lastKey = null;
-const drafts = {};
+const drafts = {}, medDrafts = {};
 let outcome = "Prescribed";
 
 function render(s) {
@@ -149,6 +149,8 @@ function renderCurrent(d, p, s) {
           <button class="btn btn-sm" type="button" id="gen-brief">${p.ai_brief ? "Write again" : "Write brief with AI"}</button></div>
         <div class="prose mt-8" id="brief-body">${p.ai_brief ? aiText(p.ai_brief) : `<p class="t-small">A short summary, questions to ask and dangerous causes to rule out. Decision support only; takes about 6 seconds.</p>`}</div>
       </section>
+      <section class="field"><label for="meds">Medicines to dispense <span class="muted">(optional)</span></label><textarea class="textarea" id="meds" aria-describedby="meds-help" placeholder="Paracetamol 500 mg, 1 tablet 3 times a day for 3 days">${esc(medDrafts[p.id] || "")}</textarea>
+        <p class="helper" id="meds-help">When you finish, this goes to the pharmacy queue. The pharmacy prepares orders in the order they arrive.</p></section>
       <section class="field"><label for="notes">Consultation notes</label><textarea class="textarea" id="notes" placeholder="Findings, treatment and advice">${esc(drafts[p.id] || "")}</textarea></section>
       <fieldset><legend class="label">Outcome</legend>
         <div class="outcomes mt-8" id="outcome">${["Discharged", "Prescribed", "Admitted", "Referred", "Follow-up"].map((o) => `<label><input type="radio" name="outcome" value="${o}" ${o === outcome ? "checked" : ""}><span>${o}</span></label>`).join("")}</div>
@@ -162,6 +164,7 @@ function renderCurrent(d, p, s) {
       <button class="btn btn-ghost" type="button" id="noshow">${icon("x")}Patient didn't come</button>
     </div>`;
   $("#notes").addEventListener("input", (e) => { drafts[p.id] = e.target.value; });
+  $("#meds").addEventListener("input", (e) => { medDrafts[p.id] = e.target.value; });
   $("#outcome").addEventListener("change", (e) => { outcome = e.target.value; });
   $("#gen-brief").onclick = async () => {
     const btn = $("#gen-brief"); btn.disabled = true;
@@ -172,9 +175,10 @@ function renderCurrent(d, p, s) {
   };
   const finish = async (next) => {
     try {
-      await api(`doctors/${d.id}/finish`, { method: "POST", body: { outcome, notes: $("#notes").value, next_status: next } });
-      delete drafts[p.id];
-      toast(`Token ${p.token} finished: ${outcome}`);
+      await api(`doctors/${d.id}/finish`, { method: "POST", body: { outcome, notes: $("#notes").value, medicines: $("#meds").value, next_status: next } });
+      const sent = $("#meds").value.trim();
+      delete drafts[p.id]; delete medDrafts[p.id];
+      toast(`Token ${p.token} finished: ${outcome}${sent ? ". Prescription sent to the pharmacy." : ""}`);
     } catch (e) { toastError(e); }
   };
   $("#finish").onclick = () => finish("available");

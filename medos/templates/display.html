@@ -18,6 +18,7 @@
   </main>
   <footer class="tv-foot">
     <div class="tv-ticker" id="ticker"></div>
+    <div class="tv-pharm" id="pharm" hidden></div>
     <div class="tv-qr"><img id="qr" alt=""><span>Scan to follow<br>your token</span></div>
   </footer>
 </div>
@@ -79,6 +80,9 @@
       <div><b>${st.avg_wait_today ? Math.round(st.avg_wait_today / 60) : "—"}</b><span>minutes average wait</span></div>
       <div><b>${st.doctors_on_duty}</b><span>doctors on duty</span></div>`;
     $("#ticker").textContent = s.settings.display_message || "";
+    const pr = s.pharmacy_ready || [];
+    $("#pharm").hidden = !pr.length;
+    $("#pharm").innerHTML = `Medicines ready at the pharmacy: ${pr.slice(0, 8).map((t) => `<b>${esc(t)}</b>`).join(" ")}`;
     $("#tv-alert").hidden = !s.alert_active;
     document.title = s.alert_active ? "Emergency · Waiting room" : "Waiting room";
   });

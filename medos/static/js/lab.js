@@ -9,6 +9,7 @@ const DUR = { critical: 25, high: 15, medium: 10, low: 7 };
 const PREEMPT_FLOOR = 1450, EMERGENCY = 5000;
 const ALGOS = [
   { id: "fcfs", name: "First come, first served", color: "var(--muted)" },
+  { id: "sjf", name: "Shortest job first", color: "var(--info)" },
   { id: "prio", name: "Priority", color: "var(--high)" },
   { id: "aging", name: "Priority + aging", color: "var(--scrub)" },
   { id: "preempt", name: "Pre-emptive + aging", color: "var(--crit)" },
@@ -46,6 +47,7 @@ function simulate(patients, { doctors, rate, cap, policy }) {
   let waiting = [], next = 0, t = 0, done = 0, preemptions = 0;
   const score = (j) => {
     if (policy === "fcfs") return -j.arrival;
+    if (policy === "sjf") return -j.duration;   // shortest consultation first, ignores how sick they are
     let s = j.base;
     if (policy !== "prio") {
       const aging = Math.min(rate * (t - j.arrival), cap);

@@ -20,7 +20,7 @@ from .voice import VoiceError, parse_checkin, voice
 api = Blueprint("api", __name__, url_prefix="/api")
 hardware = None   # set by app factory
 
-ROLE_NAMES = {"admin": "Admin", "reception": "Reception", "doctor": "Doctor"}
+ROLE_NAMES = {"admin": "Admin", "reception": "Reception", "doctor": "Doctor", "pharmacy": "Pharmacy"}
 
 
 # ---------------------------------------------------------------- helpers
@@ -201,6 +201,7 @@ def public_state(t: Optional[float] = None) -> Dict[str, Any]:
         "recent_calls": [{"token": c["token"], "room": c["room"], "doctor": c["doctor"], "level": c["level"],
                           "called_at": c["called_at"], "status": c["status"]} for c in s["recent_calls"]],
         "alert_active": bool(s["alerts"]),
+        "pharmacy_ready": pharmacy.ready_tokens(),
         "stats": {"waiting": st["queue_length"], "avg_wait_today": st["avg_wait_today"],
                   "avg_wait_now": st["avg_wait_now"], "doctors_on_duty": st["doctors_on_duty"],
                   "waiting_by_level": st["waiting_by_level"], "completed_today": st["completed_today"]},
@@ -210,7 +211,7 @@ def public_state(t: Optional[float] = None) -> Dict[str, Any]:
 
 
 @api.get("/state")
-@need(*STAFF)
+@need(*STAFF, "pharmacy")
 def state():
     return jsonify(build_state())
 
@@ -376,6 +377,7 @@ def patient_public(p: Dict[str, Any]) -> Dict[str, Any]:
         "completed_at": p["completed_at"], "outcome": p["outcome"],
         "room": room["name"] if room else None, "doctor": doc["name"] if doc else None,
         "server_time": s["server_time"], "serving": s["serving"], "waiting": s["stats"]["waiting"],
+        "pharmacy": pharmacy.for_patient(p["id"]),
         "settings": s["settings"],
     }
 
@@ -462,7 +464,8 @@ def doctor_status(did: int):
 @need("doctor")
 def doctor_finish(did: int):
     b = body()
-    scheduler.finish(did, b.get("outcome") or "", b.get("notes") or "", b.get("next_status") or "available")
+    scheduler.finish(did, b.get("outcome") or "", b.get("notes") or "", b.get("next_status") or "available",
+                     b.get("medicines") or "")
     return jsonify({"ok": True})
 
 
@@ -827,6 +830,8 @@ def system():
     return jsonify({
         "system": sysmon.snapshot(), "threads": sysmon.threads(),
         "lock": scheduler.lock.stats(),
+        "locks": [scheduler.lock.stats(), pharmacy.lock.stats(),
+                  ambulance.lock.stats()],
         "scheduler": {"dispatches": scheduler.dispatches, "preemptions": scheduler.preemptions,
                       "interrupts": scheduler.interrupts, "ticks": scheduler.ticks,
                       "started_at": scheduler.started_at, "tick_seconds": db.get_setting("tick_seconds"),
@@ -886,7 +891,7 @@ def qr():
 
 # ---------------------------------------------------------------- settings & data
 
-INT_SETTINGS = ("tick_seconds", "notify_ahead", "dur_critical", "dur_high", "dur_medium", "dur_low",
+INT_SETTINGS = ("pharmacy_prep_min", "ambulance_speed_kmh", "tick_seconds", "notify_ahead", "dur_critical", "dur_high", "dur_medium", "dur_low",
                 "llm_timeout", "alarm_buzzer_seconds")
 FLOAT_SETTINGS = ("aging_rate", "aging_cap")
 BOOL_SETTINGS = ("auto_dispatch", "require_pin", "llm_enabled", "ai_triage", "announce", "buzz_on_call")
@@ -996,4 +1001,115 @@ def demo_seed():
 def demo_clear():
     from . import demo
     demo.clear()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------- pharmacy (FCFS)
+
+from . import ambulance, pharmacy  # noqa: E402  (after the blueprint; both import the scheduler)
+
+
+@api.get("/pharmacy/state")
+@need("reception", "doctor", "pharmacy")
+def pharmacy_state():
+    return jsonify(pharmacy.state())
+
+
+@api.post("/pharmacy/orders")
+@need("reception", "doctor", "pharmacy")
+def pharmacy_add():
+    b = body()
+    pid, token, name = None, None, (b.get("name") or "").strip() or None
+    if b.get("token"):
+        p = db.row("SELECT * FROM patients WHERE token=? AND day=?", (str(b["token"]).strip().zfill(3), db.today()))
+        if not p:
+            raise ApiError("No token %s today" % b["token"])
+        pid, token, name = p["id"], p["token"], name or p["name"]
+    return jsonify(pharmacy.create_order(b.get("items") or "", pid, token, name, b.get("prescribed_by"), source="counter"))
+
+
+@api.post("/pharmacy/next")
+@need("reception", "doctor", "pharmacy")
+def pharmacy_next():
+    return jsonify(pharmacy.start_next())
+
+
+@api.post("/pharmacy/orders/<int:oid>/status")
+@need("reception", "doctor", "pharmacy")
+def pharmacy_status(oid: int):
+    return jsonify(pharmacy.set_status(oid, body().get("status") or ""))
+
+
+# ---------------------------------------------------------------- ambulance desk (SJF)
+
+@api.get("/ambulance/state")
+@need("reception", "doctor")
+def ambulance_state():
+    return jsonify(ambulance.state())
+
+
+@api.post("/ambulance/recommend")
+@need("reception", "doctor")
+def ambulance_recommend():
+    b = body()
+    if not (b.get("condition") or "").strip():
+        raise ApiError("Describe what happened")
+    return jsonify(ambulance.recommend(b.get("condition"), b.get("kind") or "emergency", b.get("area") or "", b.get("age")))
+
+
+@api.post("/ambulance/requests")
+@need("reception", "doctor")
+def ambulance_request():
+    return jsonify(ambulance.create_request(body()))
+
+
+@api.post("/ambulance/requests/<int:rid>/arrived")
+@need("reception", "doctor")
+def ambulance_arrived(rid: int):
+    return jsonify(ambulance.arrived(rid))
+
+
+@api.post("/ambulance/requests/<int:rid>/cancel")
+@need("reception", "doctor")
+def ambulance_cancel(rid: int):
+    ambulance.cancel(rid)
+    return jsonify({"ok": True})
+
+
+@api.patch("/ambulance/hospitals/<int:hid>")
+@need("reception", "doctor")
+def hospital_edit(hid: int):
+    b = body()
+    fields: Dict[str, Any] = {}
+    for k in ("beds_free", "er_wait_min"):
+        if k in b:
+            try:
+                fields[k] = max(0, int(float(b[k])))
+            except (TypeError, ValueError):
+                raise ApiError("Use a whole number")
+    if "active" in b:
+        fields["active"] = 1 if b["active"] else 0
+    if "specialties" in b:
+        fields["specialties"] = (b["specialties"] or "").strip()
+    db.update("hospitals", hid, fields)
+    bus.publish("ambulance", {"hospital_id": hid})
+    return jsonify(db.row("SELECT * FROM hospitals WHERE id=?", (hid,)))
+
+
+@api.post("/ambulance/fleet")
+@need("reception", "doctor")
+def ambulance_fleet():
+    """Add or remove an ambulance: {"change": 1} or {"change": -1}."""
+    if int(body().get("change") or 0) > 0:
+        n = (db.scalar("SELECT COUNT(*) FROM ambulances") or 0) + 1
+        db.insert("ambulances", {"name": "Ambulance %d" % n, "status": "available", "status_since": time.time()})
+        ambulance.dispatch()
+    else:
+        a = db.row("SELECT * FROM ambulances WHERE status='available' ORDER BY id DESC LIMIT 1")
+        if not a:
+            raise ApiError("Every ambulance is on a trip. Wait for one to come back.", 409)
+        if (db.scalar("SELECT COUNT(*) FROM ambulances") or 0) <= 1:
+            raise ApiError("Keep at least one ambulance")
+        db.execute("DELETE FROM ambulances WHERE id=?", (a["id"],))
+    bus.publish("ambulance", {})
     return jsonify({"ok": True})

@@ -108,6 +108,64 @@ CREATE TABLE IF NOT EXISTS events (
     data       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
+CREATE TABLE IF NOT EXISTS pharmacy_orders (
+    id           INTEGER PRIMARY KEY,
+    day          TEXT NOT NULL,
+    patient_id   INTEGER,
+    token        TEXT,
+    patient_name TEXT,
+    items        TEXT NOT NULL,
+    prescribed_by TEXT,
+    source       TEXT NOT NULL DEFAULT 'doctor',
+    status       TEXT NOT NULL DEFAULT 'waiting',
+    created_at   REAL NOT NULL,
+    started_at   REAL,
+    ready_at     REAL,
+    collected_at REAL
+);
+CREATE INDEX IF NOT EXISTS idx_pharmacy_status ON pharmacy_orders(status);
+CREATE TABLE IF NOT EXISTS hospitals (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    x_km        REAL NOT NULL DEFAULT 0,
+    y_km        REAL NOT NULL DEFAULT 0,
+    specialties TEXT NOT NULL DEFAULT '',
+    beds_free   INTEGER NOT NULL DEFAULT 5,
+    er_wait_min REAL NOT NULL DEFAULT 20,
+    is_self     INTEGER NOT NULL DEFAULT 0,
+    active      INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS ambulances (
+    id           INTEGER PRIMARY KEY,
+    name         TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'available',
+    request_id   INTEGER,
+    status_since REAL
+);
+CREATE TABLE IF NOT EXISTS ambulance_requests (
+    id            INTEGER PRIMARY KEY,
+    day           TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    patient_name  TEXT,
+    age           INTEGER,
+    condition     TEXT NOT NULL,
+    level         TEXT NOT NULL,
+    needs         TEXT,
+    pickup        TEXT NOT NULL,
+    pickup_min    REAL NOT NULL,
+    hospital_id   INTEGER,
+    hospital_name TEXT,
+    travel_min    REAL,
+    wait_min      REAL,
+    total_min     REAL,
+    ranking       TEXT,
+    status        TEXT NOT NULL DEFAULT 'waiting',
+    ambulance_id  INTEGER,
+    patient_id    INTEGER,
+    created_at    REAL NOT NULL,
+    dispatched_at REAL,
+    arrived_at    REAL
+);
 """
 
 DEFAULT_SETTINGS: Dict[str, Any] = {
@@ -140,6 +198,9 @@ DEFAULT_SETTINGS: Dict[str, Any] = {
     "buzz_on_call": False,
     "alarm_buzzer_seconds": 20,
     "display_message": "Keep your token slip with you. Emergency cases are always seen first.",
+    # Pharmacy (FCFS) and ambulance desk (SJF)
+    "pharmacy_prep_min": 4,
+    "ambulance_speed_kmh": 30,
     "demo_seeded": False,
 }
 
@@ -148,6 +209,7 @@ PUBLIC_SETTINGS = (
     "notify_ahead", "dur_critical", "dur_high", "dur_medium", "dur_low", "require_pin",
     "pins_default", "llm_enabled", "llm_url", "llm_model", "llm_timeout", "ai_triage",
     "voice_lang", "announce", "buzz_on_call", "alarm_buzzer_seconds", "display_message",
+    "pharmacy_prep_min", "ambulance_speed_kmh",
 )
 
 _local = threading.local()
@@ -328,3 +390,5 @@ def init() -> None:
                                  ("Dr. Arjun Iyer", "Orthopaedics", "Room 3")):
             insert("doctors", {"name": name, "specialty": spec, "room_id": rooms_by_name.get(room),
                                "status": "off_duty", "status_since": t, "created_at": t})
+    from .ambulance import seed_defaults
+    seed_defaults()

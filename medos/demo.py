@@ -51,6 +51,9 @@ def clear() -> None:
         db.execute("DELETE FROM patients")
         db.execute("DELETE FROM alerts")
         db.execute("DELETE FROM events")
+        db.execute("DELETE FROM pharmacy_orders")
+        db.execute("DELETE FROM ambulance_requests")
+        db.execute("UPDATE ambulances SET status='available', request_id=NULL")
         db.execute("UPDATE doctors SET current_patient_id=NULL, "
                    "status=CASE WHEN status='busy' THEN 'available' ELSE status END")
     if scheduler.hardware:
@@ -102,6 +105,27 @@ def seed() -> None:
         p = scheduler.get(a["patient_id"])
         db.update("patients", p["id"], {"called_at": t - back,
                                         "wait_seconds": max(0.0, (t - back) - p["arrived_at"])})
+    # Prescriptions from earlier visits: a few collected, then the FCFS pharmacy queue.
+    meds = ["Paracetamol 500 mg, 1 tablet 3 times a day for 3 days", "Cetirizine 10 mg at night for 5 days",
+            "ORS sachets, 1 after every loose motion; Ondansetron 4 mg if vomiting",
+            "Amoxicillin 500 mg 3 times a day for 5 days", "Pantoprazole 40 mg before breakfast for 7 days",
+            "Ibuprofen 400 mg twice a day after food for 3 days"]
+    done = db.rows("SELECT * FROM patients WHERE status='completed' ORDER BY completed_at")
+    for i, p in enumerate(done[-7:]):
+        made = (p["completed_at"] or t) + 60
+        oid = db.insert("pharmacy_orders", {"day": db.today(), "patient_id": p["id"], "token": p["token"],
+                                            "patient_name": p["name"], "items": meds[i % len(meds)],
+                                            "prescribed_by": "Dr. Karthik Menon", "source": "doctor",
+                                            "status": "waiting", "created_at": min(made, t - 60 * (7 - i))})
+        o = db.row("SELECT * FROM pharmacy_orders WHERE id=?", (oid,))
+        if i < 3:
+            db.update("pharmacy_orders", oid, {"status": "collected", "started_at": o["created_at"] + 120,
+                                               "ready_at": o["created_at"] + 360, "collected_at": o["created_at"] + 600})
+        elif i == 3:
+            db.update("pharmacy_orders", oid, {"status": "ready", "started_at": o["created_at"] + 90,
+                                               "ready_at": o["created_at"] + 300})
+        elif i == 4:
+            db.update("pharmacy_orders", oid, {"status": "preparing", "started_at": t - 120})
     db.set_setting("demo_seeded", True)
     log("SYSTEM", "Demo patients loaded: %d waiting, %d earlier today" % (len(WAITING), len(EARLIER)))
     bus.publish("queue", {"reason": "demo"})
